@@ -122,6 +122,11 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+# WhiteNoise her koşulda (DEBUG açık/kapalı, collectstatic yapılsa da yapılmasa da)
+# Django finders üzerinden admin statiklerini eksiksiz sunar:
+WHITENOISE_USE_FINDERS = True
+WHITENOISE_AUTOREFRESH = True if IS_DEV else False
+
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
