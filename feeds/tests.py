@@ -146,3 +146,48 @@ class FeedTests(TestCase):
         res_yt = self.client.get(url_yt)
         self.assertEqual(res_yt.status_code, 200)
         self.assertIn('application/rss+xml', res_yt['Content-Type'])
+
+
+class AdminViewsTestCase(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        self.admin = User.objects.create_superuser('testadmin', 'admin@example.com', 'password123')
+        self.client.force_login(self.admin)
+        
+        # Create category with and without icon
+        self.cat1 = Category.objects.create(name='Bilim', slug='bilim', icon_url='https://example.com/b.png')
+        self.cat2 = Category.objects.create(name='Tarih', slug='tarih')
+        
+        # Create channels: with own icon, with inherited icon, with no icon
+        self.ch1 = Channel.objects.create(name='Evrim Ağacı', slug='evrim-agaci', category=self.cat1, icon_url='https://example.com/e.png')
+        self.ch2 = Channel.objects.create(name='Popüler Bilim', slug='populer-bilim', category=self.cat1)
+        self.ch3 = Channel.objects.create(name='Genel Kanal', slug='genel-kanal')
+        
+        self.item = FeedItem.objects.create(
+            channel=self.ch1,
+            item_id='item-01',
+            content_type='video',
+            title='Test Video',
+            url='https://example.com/v',
+            published_at='2026-11-12T10:00:00Z',
+        )
+
+    def test_admin_changelist_views(self):
+        # Ensure all admin list views render without 500
+        for model in ['channel', 'category', 'feeditem', 'apikey']:
+            res = self.client.get(f'/admin/feeds/{model}/')
+            self.assertEqual(res.status_code, 200, f'Admin changelist for {model} failed')
+
+    def test_admin_changeform_views(self):
+        # Ensure change forms render without 500
+        res_ch = self.client.get(f'/admin/feeds/channel/{self.ch1.id}/change/')
+        self.assertEqual(res_ch.status_code, 200)
+        res_ch2 = self.client.get(f'/admin/feeds/channel/{self.ch2.id}/change/')
+        self.assertEqual(res_ch2.status_code, 200)
+        res_ch3 = self.client.get(f'/admin/feeds/channel/{self.ch3.id}/change/')
+        self.assertEqual(res_ch3.status_code, 200)
+        res_cat = self.client.get(f'/admin/feeds/category/{self.cat1.id}/change/')
+        self.assertEqual(res_cat.status_code, 200)
+        res_cat2 = self.client.get(f'/admin/feeds/category/{self.cat2.id}/change/')
+        self.assertEqual(res_cat2.status_code, 200)

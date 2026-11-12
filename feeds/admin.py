@@ -26,7 +26,7 @@ class CategoryAdmin(admin.ModelAdmin):
                 '<img src="{}" style="width:22px; height:22px; object-fit:contain; border-radius:4px; vertical-align:middle;" onerror="this.style.display=\'none\'" />',
                 obj.icon_url
             )
-        return format_html('<span style="color:#999; font-size:12px;">Logo Yok</span>')
+        return mark_safe('<span style="color:#999; font-size:12px;">Logo Yok</span>')
     favicon_preview.short_description = 'Logo'
 
     def favicon_preview_large(self, obj):
@@ -65,7 +65,7 @@ class ChannelAdmin(admin.ModelAdmin):
                 '<img src="{}" title="{}" style="width:22px; height:22px; object-fit:contain; border-radius:4px; vertical-align:middle; border:{};" onerror="this.style.display=\'none\'" />',
                 effective_icon, badge_title, border_style
             )
-        return format_html('<span style="color:#999; font-size:12px;">Logo Yok</span>')
+        return mark_safe('<span style="color:#999; font-size:12px;">Logo Yok</span>')
     favicon_preview.short_description = 'Logo'
 
     def favicon_preview_large(self, obj):
