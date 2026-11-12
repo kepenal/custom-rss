@@ -6,8 +6,8 @@ services:
     environment:
       - ENVIRONMENT=development
       - DEBUG=True
-      - ALLOWED_HOSTS=*
-      - CSRF_TRUSTED_ORIGINS=http://localhost:8000,http://127.0.0.1:8000
+      - ALLOWED_HOSTS=crss.armaganuzun.com,localhost,127.0.0.1,0.0.0.0
+      - CSRF_TRUSTED_ORIGINS=https://crss.armaganuzun.com,http://localhost:8000,http://127.0.0.1:8000
       - DB_ENGINE=django.db.backends.postgresql
       - DB_HOST=db
       - DB_PORT=5432
