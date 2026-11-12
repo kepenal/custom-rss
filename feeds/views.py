@@ -23,7 +23,7 @@ def build_rss_xml(title, link, description, items, request_url, icon_url=''):
     build_date_str = date_format(timezone.now(), 'r')
     xml_lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">',
+        '<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/">',
         '  <channel>',
         f'    <title>{xml_escape(title)}</title>',
         f'    <link>{xml_escape(link)}</link>',
@@ -49,7 +49,24 @@ def build_rss_xml(title, link, description, items, request_url, icon_url=''):
         pub_date_str = date_format(item.published_at, 'r')
         html_parts = []
         if item.summary:
-            html_parts.append(f"<h3>Özet</h3><p>{xml_escape(item.summary)}</p>")
+            summary_clean = str(item.summary).strip()
+            # HTML etiketleri (<b>, <a>, <p>, <br> vb.) CDATA içinde korunmalı,
+            # xml_escape YAPILMAMALIDIR. Aksi halde FreshRSS ve RSS okuyucularda
+            # etiketler düz metin (&lt;b&gt;) olarak render edilir.
+            if summary_clean.startswith("<p") or summary_clean.startswith("<div"):
+                html_parts.append(f"<h3>Özet</h3>\n{summary_clean}")
+            else:
+                # Düz metin ise ve blok etiket içermiyorsa satır sonlarını işle
+                if "\n" in summary_clean and not any(tag in summary_clean.lower() for tag in ["<p", "<div", "<br", "<ul", "<ol"]):
+                    paragraphs = [p.strip() for p in summary_clean.split("\n\n") if p.strip()]
+                    if len(paragraphs) > 1:
+                        formatted_p = "\n".join(f"<p>{p.replace(chr(10), "<br/>")}</p>" for p in paragraphs)
+                        html_parts.append(f"<h3>Özet</h3>\n{formatted_p}")
+                    else:
+                        formatted_br = summary_clean.replace("\n", "<br/>")
+                        html_parts.append(f"<h3>Özet</h3><p>{formatted_br}</p>")
+                else:
+                    html_parts.append(f"<h3>Özet</h3><p>{summary_clean}</p>")
 
         if item.key_moments:
             is_video = (item.content_type == 'video')
@@ -59,7 +76,7 @@ def build_rss_xml(title, link, description, items, request_url, icon_url=''):
                 if isinstance(km, dict):
                     t_label = xml_escape(str(km.get('time', '')).strip())
                     t_sec = km.get('seconds', 0)
-                    t_text = xml_escape(str(km.get('text', '')).strip())
+                    t_text = str(km.get('text', '')).strip()
 
                     if is_video and t_sec and int(t_sec) > 0 and not str(item.item_id).startswith('http'):
                         time_url = f"https://youtu.be/{item.item_id}?t={t_sec}"
@@ -69,7 +86,7 @@ def build_rss_xml(title, link, description, items, request_url, icon_url=''):
                         badge = f"<strong>[{t_label}]</strong> " if t_label else ""
                         html_parts.append(f"<li>{badge}{t_text}</li>")
                 elif isinstance(km, str):
-                    html_parts.append(f"<li>{xml_escape(km)}</li>")
+                    html_parts.append(f"<li>{str(km).strip()}</li>")
             html_parts.append("</ul>")
 
         cta_text = "YouTube'da İzle &rarr;" if item.content_type == 'video' else "Kaynağa Git &rarr;"
@@ -81,7 +98,9 @@ def build_rss_xml(title, link, description, items, request_url, icon_url=''):
         xml_lines.append(f'      <link>{xml_escape(item.url)}</link>')
         xml_lines.append(f'      <guid isPermaLink="false">{item.item_id}</guid>')
         xml_lines.append(f'      <pubDate>{pub_date_str}</pubDate>')
-        xml_lines.append(f'      <description><![CDATA[{description_html}]]></description>')
+        safe_cdata_html = description_html.replace("]]>", "]]]]><![CDATA[>")
+        xml_lines.append(f'      <description><![CDATA[{safe_cdata_html}]]></description>')
+        xml_lines.append(f'      <content:encoded><![CDATA[{safe_cdata_html}]]></content:encoded>')
         xml_lines.append('    </item>')
 
     xml_lines.append('  </channel>')

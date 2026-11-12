@@ -153,6 +153,43 @@ class FeedTests(TestCase):
         chan = Channel.objects.filter(slug='evrim-agaci').first()
         self.assertEqual(chan.category, cat)
 
+    def test_html_in_summary_and_content_encoded(self):
+        """
+        FreshRSS ve RSS okuyucularda HTML etiketlerinin (<b>, <a> vb.)
+        düz metin olarak görünmemesini, CDATA içinde ham HTML olarak kalmasını
+        ve <content:encoded> modülünün eklenmesini doğrular.
+        """
+        payload = {
+            'video_id': 'vid_html_test_01',
+            'title': 'HTML Test Videosu',
+            'summary': 'Bu bölümde <b>yapay zeka</b> ve <a href="https://example.com">araçlar</a> ele alınıyor.',
+            'key_moments': [
+                {'time': '02:00', 'seconds': 120, 'text': '<b>Önemli</b> nokta'}
+            ]
+        }
+        res_post = self.client.post(
+            '/teknoloji/ai-kanali',
+            data=json.dumps(payload),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Bearer {self.write_token}',
+        )
+        self.assertEqual(res_post.status_code, 201)
+
+        res_get = self.client.get(f'/teknoloji/ai-kanali?key={self.read_token}')
+        self.assertEqual(res_get.status_code, 200)
+        xml_str = res_get.content.decode('utf-8')
+
+        # XML namespace kontrolü
+        self.assertIn('xmlns:content="http://purl.org/rss/1.0/modules/content/"', xml_str)
+        # <content:encoded> etiketi kontrolü
+        self.assertIn('<content:encoded><![CDATA[', xml_str)
+        # HTML etiketlerinin escape EDİLMEDİĞİ ve ham HTML olarak korunduğu kontrolü
+        self.assertIn('<b>yapay zeka</b>', xml_str)
+        self.assertNotIn('&lt;b&gt;yapay zeka&lt;/b&gt;', xml_str)
+        self.assertIn('<a href="https://example.com">araçlar</a>', xml_str)
+        self.assertNotIn('&lt;a href=', xml_str)
+        self.assertIn('<b>Önemli</b> nokta', xml_str)
+
 
 class AdminViewsTestCase(TestCase):
     def setUp(self):
