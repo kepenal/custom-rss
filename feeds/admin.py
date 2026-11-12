@@ -2,6 +2,7 @@ import os
 from django import forms
 from django.contrib import admin, messages
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from .models import Channel, VideoItem, ApiKey
 from .utils import generate_api_key, hash_token
 
@@ -68,25 +69,25 @@ class ApiKeyAdmin(admin.ModelAdmin):
 
     def key_type_badge(self, obj):
         if obj.key_type == 'write':
-            return format_html('<span style="background:#d1ecf1; color:#0c5460; padding:3px 8px; border-radius:4px; font-weight:bold;">Yazma (n8n API)</span>')
-        return format_html('<span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:4px; font-weight:bold;">Okuma (RSS Feed)</span>')
+            return mark_safe('<span style="background:#d1ecf1; color:#0c5460; padding:3px 8px; border-radius:4px; font-weight:bold;">Yazma (n8n API)</span>')
+        return mark_safe('<span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:4px; font-weight:bold;">Okuma (RSS Feed)</span>')
     key_type_badge.short_description = 'Yetki Türü'
 
     def usage_guide(self, obj):
         if not obj.pk:
             return '-'
         if obj.key_type == 'write':
-            return format_html(
+            return mark_safe(
                 '<div style="line-height:1.6;">'
                 '<strong>n8n veya API İstemcisi için:</strong><br>'
                 'Header: <code>Authorization: Bearer &lt;ANAHTAR&gt;</code> veya <code>X-API-Key: &lt;ANAHTAR&gt;</code><br>'
                 'Endpoint: <code>POST /api/flows</code>'
                 '</div>'
             )
-        return format_html(
+        return mark_safe(
             '<div style="line-height:1.6;">'
             '<strong>FreeRSS veya RSS Okuyucu için:</strong><br>'
-            'Feed URL: <code>https://rss.yourdomain.com/youtube/&lt;kanal-slug&gt;?key=&lt;ANAHTAR&gt;</code>'
+            'Feed URL: <code>https://crss.armaganuzun.com/youtube/&lt;kanal-slug&gt;?key=&lt;ANAHTAR&gt;</code>'
             '</div>'
         )
     usage_guide.short_description = 'Kullanım Kılavuzu'
@@ -104,11 +105,11 @@ class ApiKeyAdmin(admin.ModelAdmin):
             obj.key_hash = key_hash
             obj.key_prefix = key_prefix
             
-            instructions = (
+            instructions = mark_safe((
                 "n8n HTTP Request node başlığına <code>Authorization: Bearer {}</code> ekleyin."
                 if obj.key_type == 'write' else
                 "RSS okuyucunuzun URL alanına <code>?key={}</code> parametresini ekleyin."
-            ).format(raw_token)
+            ).format(raw_token))
 
             messages.warning(
                 request,
