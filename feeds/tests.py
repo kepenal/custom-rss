@@ -28,7 +28,7 @@ class FeedsTestCase(TestCase):
 
     def test_slug_normalization(self):
         cases = [
-            ('Barış Özcan', 'baris-ozcan'),
+            ('Evrim Ağacı', 'evrim-agaci'),
             ('  Türkçe Karakterler İle Test 123! ', 'turkce-karakterler-ile-test-123'),
             ('Software & Tech News', 'software-tech-news'),
         ]
@@ -45,14 +45,14 @@ class FeedsTestCase(TestCase):
 
     def test_flow_ingest_success_and_idempotency(self):
         payload = {
-            'channel': 'Barış Özcan',
-            'channel_url': 'https://www.youtube.com/@BarisOzcan',
+            'channel': 'Evrim Ağacı',
+            'channel_url': 'https://www.youtube.com/@evrimagaci',
             'video_id': 'vid_test_001',
-            'title': 'Evrenin Sonu Nasıl Olacak?',
-            'summary': 'Bu videoda kozmolojik modeller ve evrenin olası son senaryoları ele alınıyor.',
+            'title': 'Evrim Teorisi ve Doğal Seçilim',
+            'summary': 'Bu videoda evrim teorisi ve türleşme süreçleri ele alınıyor.',
             'key_moments': [
                 {'time': '00:00', 'seconds': 0, 'text': 'Giriş'},
-                {'time': '02:45', 'seconds': 165, 'text': 'Büyük Donma Teorisi'},
+                {'time': '02:45', 'seconds': 165, 'text': 'Doğal Seçilim Mekanizması'},
             ]
         }
         
@@ -66,13 +66,13 @@ class FeedsTestCase(TestCase):
         self.assertEqual(response1.status_code, 201)
         res1_json = response1.json()
         self.assertEqual(res1_json['action'], 'created')
-        self.assertEqual(res1_json['channel'], 'baris-ozcan')
+        self.assertEqual(res1_json['channel'], 'evrim-agaci')
         
         # Check DB
         self.assertEqual(Channel.objects.count(), 1)
         self.assertEqual(VideoItem.objects.count(), 1)
         video = VideoItem.objects.get(video_id='vid_test_001')
-        self.assertEqual(video.title, 'Evrenin Sonu Nasıl Olacak?')
+        self.assertEqual(video.title, 'Evrim Teorisi ve Doğal Seçilim')
         self.assertEqual(len(video.key_moments), 2)
         
         # 2. Update with X-API-Key header (Idempotent update)
