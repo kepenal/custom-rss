@@ -79,8 +79,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database configuration: PostgreSQL with SQLite fallback for local test/dev
-DB_ENGINE = os.getenv('DB_ENGINE', 'django.db.backends.postgresql' if not IS_DEV else 'django.db.backends.sqlite3')
+# Database configuration:
+# Docker / Prod ortamında DB_ENGINE veya DB_HOST tanımlandığında PostgreSQL kullanılır;
+# Yerel geliştirmede / test koşumlarında harici DB yoksa SQLite fallback yapılır.
+DB_ENGINE = os.getenv('DB_ENGINE')
+if not DB_ENGINE:
+    if os.getenv('DB_HOST'):
+        DB_ENGINE = 'django.db.backends.postgresql'
+    else:
+        DB_ENGINE = 'django.db.backends.sqlite3'
+
 if DB_ENGINE == 'django.db.backends.postgresql':
     DATABASES = {
         'default': {
