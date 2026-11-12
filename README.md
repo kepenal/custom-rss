@@ -134,7 +134,7 @@ curl -X POST http://localhost:8000/api/flows \
 FreeRSS veya herhangi bir RSS okuyucuda URL alanına:
 
 ```
-https://rss.yourdomain.com/youtube/baris-ozcan?key=<READ_TOKEN>
+https://crss.armaganuzun.com/youtube/baris-ozcan?key=<READ_KEY>
 ```
 
 ya da (eğer istemci başlık destekliyorsa):

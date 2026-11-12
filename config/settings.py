@@ -25,15 +25,13 @@ if _debug_env is not None:
 else:
     DEBUG = True if IS_DEV else False
 
-ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', '*' if IS_DEV else '').split(',') if h.strip()]
-if not ALLOWED_HOSTS:
-    ALLOWED_HOSTS = ['*'] if IS_DEV else ['localhost', '127.0.0.1']
+# Allowed Hosts & CSRF: crss.armaganuzun.com alan adı ve yerel fallback
+DEFAULT_ALLOWED_HOSTS = 'crss.armaganuzun.com,localhost,127.0.0.1' if not IS_DEV else 'crss.armaganuzun.com,localhost,127.0.0.1,0.0.0.0'
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', DEFAULT_ALLOWED_HOSTS).split(',') if h.strip()]
 
+DEFAULT_CSRF_ORIGINS = 'https://crss.armaganuzun.com,http://localhost:8000,http://127.0.0.1:8000'
 CSRF_TRUSTED_ORIGINS = [
-    o.strip() for o in os.getenv(
-        'CSRF_TRUSTED_ORIGINS',
-        'http://localhost,http://127.0.0.1,http://0.0.0.0:8000' if IS_DEV else 'http://localhost'
-    ).split(',') if o.strip()
+    o.strip() for o in os.getenv('CSRF_TRUSTED_ORIGINS', DEFAULT_CSRF_ORIGINS).split(',') if o.strip()
 ]
 
 INSTALLED_APPS = [
@@ -135,9 +133,7 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Custom RSS & Auth Settings
-WRITE_API_KEY = os.getenv('WRITE_API_KEY', '')
-READ_API_KEY = os.getenv('READ_API_KEY', '')
+# Feed Settings
 RSS_FEED_LIMIT = int(os.getenv('RSS_FEED_LIMIT', '50'))
 
 # Reverse Proxy & Security Settings
