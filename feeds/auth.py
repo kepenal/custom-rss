@@ -26,15 +26,17 @@ def authenticate_request(request, required_type: str = 'write') -> tuple[bool, s
     if not token:
         return False, 'API anahtarı bulunamadı. Lütfen Authorization başlığı (Bearer), X-API-Key veya URL parametresi (?key=) ile geçerli bir anahtar sağlayın.'
         
-    env_key = getattr(settings, 'WRITE_API_KEY', '') if required_type == 'write' else getattr(settings, 'READ_API_KEY', '')
-    if env_key and token == env_key.strip():
-        return True, 'env'
-        
+    # 1. Öncelik: Django Admin üzerinden oluşturulan veritabanı API Anahtarları (SHA-256)
     token_hash = hash_token(token)
     api_key_obj = ApiKey.objects.filter(key_hash=token_hash, key_type=required_type, is_active=True).first()
     if api_key_obj:
         api_key_obj.last_used_at = timezone.now()
         api_key_obj.save(update_fields=['last_used_at'])
         return True, f'db:{api_key_obj.id}'
+        
+    # 2. Opsiyonel fallback: Ortam değişkeni
+    env_key = getattr(settings, 'WRITE_API_KEY', '') if required_type == 'write' else getattr(settings, 'READ_API_KEY', '')
+    if env_key and token == env_key.strip():
+        return True, 'env'
         
     return False, 'Geçersiz veya yetkisiz API anahtarı.'

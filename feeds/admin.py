@@ -38,9 +38,9 @@ class VideoItemAdmin(admin.ModelAdmin):
 class ApiKeyAdminForm(forms.ModelForm):
     raw_token = forms.CharField(
         required=False,
-        label='Özel Anahtar (Boş bırakılırsa otomatik güvenli anahtar üretilir)',
-        help_text='Kendi belirlediğiniz bir token girebilirsiniz veya otomatik üretilmesini sağlayabilirsiniz.',
-        widget=forms.TextInput(attrs={'style': 'width: 450px;'}),
+        label='Özel Anahtar Değeri (Opsiyonel)',
+        help_text='Boş bırakırsanız sistem otomatik olarak yüksek entropili, güvenli bir anahtar üretecektir.',
+        widget=forms.TextInput(attrs={'style': 'width: 480px; padding: 6px;', 'placeholder': 'Otomatik üretim için boş bırakın...'}),
     )
 
     class Meta:
@@ -51,14 +51,39 @@ class ApiKeyAdminForm(forms.ModelForm):
 @admin.register(ApiKey)
 class ApiKeyAdmin(admin.ModelAdmin):
     form = ApiKeyAdminForm
-    list_display = ('name', 'key_prefix_display', 'key_type', 'is_active', 'last_used_at', 'created_at')
+    list_display = ('name', 'key_prefix_display', 'key_type_badge', 'is_active', 'last_used_at', 'created_at')
     list_filter = ('key_type', 'is_active')
-    readonly_fields = ('key_hash', 'key_prefix', 'last_used_at', 'created_at')
+    readonly_fields = ('key_hash', 'key_prefix', 'last_used_at', 'created_at', 'usage_guide')
     search_fields = ('name', 'key_prefix')
     
     def key_prefix_display(self, obj):
         return f"{obj.key_prefix}..."
     key_prefix_display.short_description = 'Anahtar Ön Eki'
+
+    def key_type_badge(self, obj):
+        if obj.key_type == 'write':
+            return format_html('<span style="background:#d1ecf1; color:#0c5460; padding:3px 8px; border-radius:4px; font-weight:bold;">Yazma (n8n API)</span>')
+        return format_html('<span style="background:#d4edda; color:#155724; padding:3px 8px; border-radius:4px; font-weight:bold;">Okuma (RSS Feed)</span>')
+    key_type_badge.short_description = 'Yetki Türü'
+
+    def usage_guide(self, obj):
+        if not obj.pk:
+            return '-'
+        if obj.key_type == 'write':
+            return format_html(
+                '<div style="line-height:1.6;">'
+                '<strong>n8n veya API İstemcisi için:</strong><br>'
+                'Header: <code>Authorization: Bearer &lt;ANAHTAR&gt;</code> veya <code>X-API-Key: &lt;ANAHTAR&gt;</code><br>'
+                'Endpoint: <code>POST /api/flows</code>'
+                '</div>'
+            )
+        return format_html(
+            '<div style="line-height:1.6;">'
+            '<strong>FreeRSS veya RSS Okuyucu için:</strong><br>'
+            'Feed URL: <code>https://rss.yourdomain.com/youtube/&lt;kanal-slug&gt;?key=&lt;ANAHTAR&gt;</code>'
+            '</div>'
+        )
+    usage_guide.short_description = 'Kullanım Kılavuzu'
 
     def save_model(self, request, obj, form, change):
         raw_token = form.cleaned_data.get('raw_token', '').strip()
@@ -73,12 +98,22 @@ class ApiKeyAdmin(admin.ModelAdmin):
             obj.key_hash = key_hash
             obj.key_prefix = key_prefix
             
+            instructions = (
+                "n8n HTTP Request node başlığına <code>Authorization: Bearer {}</code> ekleyin."
+                if obj.key_type == 'write' else
+                "RSS okuyucunuzun URL alanına <code>?key={}</code> parametresini ekleyin."
+            ).format(raw_token)
+
             messages.warning(
                 request,
                 format_html(
-                    "<strong>YENİ API ANAHTARI ÜRETİLDİ:</strong> <code style='font-size:14px; background:#fff3cd; padding:3px 6px; border:1px solid #ffeeba;'>{}</code><br>"
-                    "Bu anahtar sadece bir kez gösterilir! Güvenli bir yere kaydedin.",
-                    raw_token
+                    "<div style='font-size:14px;'>"
+                    "<strong>✅ YENİ API ANAHTARI ÜRETİLDİ:</strong><br>"
+                    "<input type='text' readonly value='{}' style='font-size:15px; font-family:monospace; background:#fff3cd; color:#856404; padding:6px 10px; width:520px; border:1px solid #ffeeba; margin:6px 0;' onclick='this.select();' /><br>"
+                    "⚠️ <em>Bu anahtar veritabanında SHA-256 olarak saklanır ve tekrar görüntülenemez. Lütfen kopyalayıp güvenli bir yere kaydedin.</em><br>"
+                    "<strong>Nasıl Kullanılır?</strong> {}"
+                    "</div>",
+                    raw_token, instructions
                 )
             )
         super().save_model(request, obj, form, change)
