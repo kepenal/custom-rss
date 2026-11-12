@@ -100,8 +100,8 @@ n8n iş akışları veya harici istemcilerden YouTube video özetlerini ve zaman
 
 | Alan Adı | Tip | Zorunlu mu? | Açıklama |
 |---|---|:---:|---|
-| `channel` | string | **Evet** | YouTube kanalının adı (örn: `Barış Özcan`). Kanal sistemde yoksa otomatik açılır. |
-| `channel_url` | string (URL) | Hayır | YouTube kanalının bağlantısı (örn: `https://www.youtube.com/@BarisOzcan`). |
+| `channel` | string | **Evet** | YouTube kanalının adı (örn: `Evrim Ağacı`). Kanal sistemde yoksa otomatik açılır. |
+| `channel_url` | string (URL) | Hayır | YouTube kanalının bağlantısı (örn: `https://www.youtube.com/@evrimagaci`). |
 | `video_id` | string | **Evet** | YouTube Video ID'si (örn: `dQw4w9WgXcQ`). Benzersizdir (Unique). |
 | `title` | string | **Evet** | Videonun başlığı. |
 | `url` | string (URL) | Hayır | Video doğrudan izleme linki. Boş bırakılırsa `https://www.youtube.com/watch?v=<video_id>` olarak otomatik atanır. |
@@ -121,23 +121,23 @@ n8n iş akışları veya harici istemcilerden YouTube video özetlerini ve zaman
 #### Örnek cURL Çağrısı:
 ```bash
 curl -X POST https://crss.armaganuzun.com/api/flows   -H "Authorization: Bearer crss_write_9a8b7c6d5e4f3a2b1c0d"   -H "Content-Type: application/json"   -d '{
-    "channel": "Barış Özcan",
-    "channel_url": "https://www.youtube.com/@BarisOzcan",
+    "channel": "Evrim Ağacı",
+    "channel_url": "https://www.youtube.com/@evrimagaci",
     "video_id": "dQw4w9WgXcQ",
-    "title": "Evrenin Sonu Nasıl Olacak?",
+    "title": "Evrim Teorisi ve Doğal Seçilim",
     "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
     "published_at": "2026-11-12T10:00:00Z",
-    "summary": "Kozmolojik modeller ve evrenin olası son senaryoları ele alınıyor.",
+    "summary": "Evrim teorisi, doğal seçilim mekanizmaları ve türleşme süreçleri ele alınıyor.",
     "key_moments": [
       {
         "time": "01:23",
         "seconds": 83,
-        "text": "Büyük Donma (Big Freeze) açıklaması"
+        "text": "Doğal Seçilim Mekanizması"
       },
       {
         "time": "05:40",
         "seconds": 340,
-        "text": "Karanlık Enerji etkisi"
+        "text": "Türleşme Örnekleri"
       }
     ]
   }'
@@ -151,8 +151,8 @@ curl -X POST https://crss.armaganuzun.com/api/flows   -H "Authorization: Bearer 
   "status": "ok",
   "action": "created",
   "video_id": "dQw4w9WgXcQ",
-  "channel": "baris-ozcan",
-  "title": "Evrenin Sonu Nasıl Olacak?"
+  "channel": "evrim-agaci",
+  "title": "Evrim Teorisi ve Doğal Seçilim"
 }
 ```
 
@@ -162,8 +162,8 @@ curl -X POST https://crss.armaganuzun.com/api/flows   -H "Authorization: Bearer 
   "status": "ok",
   "action": "updated",
   "video_id": "dQw4w9WgXcQ",
-  "channel": "baris-ozcan",
-  "title": "Evrenin Sonu Nasıl Olacak?"
+  "channel": "evrim-agaci",
+  "title": "Evrim Teorisi ve Doğal Seçilim"
 }
 ```
 
@@ -188,7 +188,7 @@ FreeRSS, Feedly, Inoreader, NetNewsWire, Thunderbird veya herhangi bir RSS okuyu
 
 #### Kanal Slug Mantığı:
 Kanal isimlerindeki Türkçe karakterler ve boşluklar otomatik çevrilir:
-- *Barış Özcan* &rarr; `baris-ozcan`
+- *Evrim Ağacı* &rarr; `evrim-agaci`
 - *Murat Şen* &rarr; `murat-sen`
 - *Yukarıalınlı Köyü* &rarr; `yukarialinli-koyu`
 
@@ -196,12 +196,12 @@ Kanal isimlerindeki Türkçe karakterler ve boşluklar otomatik çevrilir:
 RSS okuyucu uygulamanıza (FreeRSS vb.) feed linki eklerken URL sonuna `?key=...` parametresini ekleyin:
 
 ```
-https://crss.armaganuzun.com/youtube/baris-ozcan?key=crss_read_SIZIN_ANAHTARINIZ
+https://crss.armaganuzun.com/youtube/evrim-agaci?key=crss_read_SIZIN_ANAHTARINIZ
 ```
 
 #### cURL İle Test:
 ```bash
-curl -X GET "https://crss.armaganuzun.com/youtube/baris-ozcan?key=crss_read_SIZIN_ANAHTARINIZ"
+curl -X GET "https://crss.armaganuzun.com/youtube/evrim-agaci?key=crss_read_SIZIN_ANAHTARINIZ"
 ```
 
 #### Dönen XML Akışı (RSS 2.0 Standart):
@@ -209,24 +209,24 @@ curl -X GET "https://crss.armaganuzun.com/youtube/baris-ozcan?key=crss_read_SIZI
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Barış Özcan - YouTube RSS</title>
-    <link>https://www.youtube.com/@BarisOzcan</link>
-    <description>Barış Özcan kanalına ait yapay zekâ özetli ve zaman damgalı RSS feed akışı.</description>
+    <title>Evrim Ağacı - YouTube RSS</title>
+    <link>https://www.youtube.com/@evrimagaci</link>
+    <description>Evrim Ağacı kanalına ait yapay zekâ özetli ve zaman damgalı RSS feed akışı.</description>
     <language>tr</language>
     <lastBuildDate>Thu, 12 Nov 2026 14:00:00 +0000</lastBuildDate>
-    <atom:link href="https://crss.armaganuzun.com/youtube/baris-ozcan" rel="self" type="application/rss+xml"/>
+    <atom:link href="https://crss.armaganuzun.com/youtube/evrim-agaci" rel="self" type="application/rss+xml"/>
     <item>
-      <title>Evrenin Sonu Nasıl Olacak?</title>
+      <title>Evrim Teorisi ve Doğal Seçilim</title>
       <link>https://www.youtube.com/watch?v=dQw4w9WgXcQ</link>
       <guid isPermaLink="false">dQw4w9WgXcQ</guid>
       <pubDate>Thu, 12 Nov 2026 10:00:00 +0000</pubDate>
       <description><![CDATA[
         <h3>Özet</h3>
-        <p>Kozmolojik modeller ve evrenin olası son senaryoları ele alınıyor.</p>
+        <p>Evrim teorisi, doğal seçilim mekanizmaları ve türleşme süreçleri ele alınıyor.</p>
         <h3>Önemli Anlar</h3>
         <ul>
-          <li><a href="https://youtu.be/dQw4w9WgXcQ?t=83" target="_blank"><strong>[01:23]</strong></a> Büyük Donma (Big Freeze) açıklaması</li>
-          <li><a href="https://youtu.be/dQw4w9WgXcQ?t=340" target="_blank"><strong>[05:40]</strong></a> Karanlık Enerji etkisi</li>
+          <li><a href="https://youtu.be/dQw4w9WgXcQ?t=83" target="_blank"><strong>[01:23]</strong></a> Doğal Seçilim Mekanizması</li>
+          <li><a href="https://youtu.be/dQw4w9WgXcQ?t=340" target="_blank"><strong>[05:40]</strong></a> Türleşme Örnekleri</li>
         </ul>
         <hr/>
         <p><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank">YouTube'da İzle &rarr;</a></p>
