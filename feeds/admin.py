@@ -1,8 +1,14 @@
+import os
 from django import forms
 from django.contrib import admin, messages
 from django.utils.html import format_html
 from .models import Channel, VideoItem, ApiKey
 from .utils import generate_api_key, hash_token
+
+# Admin Paneli Başlıkları (Docker Environment üzerinden özelleştirilebilir)
+admin.site.site_header = os.getenv('DJANGO_ADMIN_SITE_HEADER', 'Custom RSS Yönetimi')
+admin.site.site_title = os.getenv('DJANGO_ADMIN_SITE_TITLE', 'Custom RSS Yönetim Paneli')
+admin.site.index_title = os.getenv('DJANGO_ADMIN_INDEX_TITLE', 'Akış ve API Yönetimi')
 
 @admin.register(Channel)
 class ChannelAdmin(admin.ModelAdmin):
