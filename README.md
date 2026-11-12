@@ -20,25 +20,28 @@ Bu proje, arayüzü olmayan (headless), Django tabanlı bir arka plan servisidir
 
 ## Kurulum ve Dağıtım
 
-### 1. Docker Compose İle (Tavsiye Edilen)
+### 1. Portainer ile Dağıtım (Tavsiye Edilen)
 
-1. Depoyu klonlayın ve dizine geçin:
-   ```bash
-   git clone git@github.com:kepenal/custom-rss.git
-   cd custom-rss
-   ```
-2. `.env` dosyasını oluşturun:
-   ```bash
-   cp .env.example .env
-   nano .env  # Parolaları ve SECRET_KEY değerlerini düzenleyin
-   ```
-3. Servisi başlatın:
-   ```bash
-   docker compose up -d --build
-   ```
-4. Servis `http://localhost:8000` üzerinde hazırdır.
-   - Django Admin: `http://localhost:8000/admin/` (.env içindeki `DJANGO_SUPERUSER_*` ile)
-   - Sağlık Kontrolü: `http://localhost:8000/health/`
+1. Portainer panelinizde **Stacks -> Add Stack** bölümüne gidin.
+2. **Repository** seçeneğini seçin:
+   - **Repository URL:** `git@github.com:kepenal/custom-rss.git` (veya HTTPS adresi)
+   - **Repository reference:** `refs/heads/main`
+   - **Compose path:** `docker-compose.yml`
+3. **Deploy the stack** butonuna tıklayın (Fiziksel `.env` dosyasına gerek yoktur, tüm değişkenler compose içinde tanımlıdır).
+4. İsteğe bağlı olarak admin şifresini Portainer arayüzündeki *Environment variables* alanından değiştirebilirsiniz (`DJANGO_SUPERUSER_PASSWORD`).
+
+### 2. Docker Compose CLI İle
+
+```bash
+git clone git@github.com:kepenal/custom-rss.git
+cd custom-rss
+
+# Production modunda başlatma:
+docker compose up -d --build
+
+# Development (Canlı kod geliştirme & debug):
+docker compose -f docker-compose.dev.yml up --build
+```
 
 ### 2. Yerel Geliştirme (Python Sanal Ortam)
 
@@ -51,6 +54,20 @@ python manage.py migrate
 python manage.py test
 python manage.py runserver 0.0.0.0:8000
 ```
+
+---
+
+## API Anahtarı Oluşturma (Django Admin)
+
+API anahtarları `.env` içine yazılmaz, veritabanında SHA-256 hash ile güvenle saklanır:
+
+1. `http://<sunucu-ip-veya-domain>:8000/admin/` adresine gidin.
+2. `admin` kullanıcısı ile giriş yapın.
+3. **API Anahtarları -> Ekle** butonuna tıklayın.
+4. Bir isim verin (örn: `n8n Entegrasyonu` veya `FreeRSS Okuyucum`) ve **Yetki Türü**nü seçin:
+   - **Yazma Yetkisi (`write`):** n8n akışlarından `POST /api/flows` ucuna video basmak için.
+   - **Okuma Yetkisi (`read`):** FreeRSS vb. istemcilerden `GET /youtube/<channel_slug>` akışını okumak için.
+5. **Kaydet** dediğinizde sistem size tek seferlik gösterilecek anahtarı (`crss_write_...` veya `crss_read_...`) ve hazır bağlantı şablonunu verecektir.
 
 ---
 
