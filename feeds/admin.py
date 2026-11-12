@@ -168,16 +168,18 @@ class ApiKeyAdmin(admin.ModelAdmin):
         if obj.key_type == 'write':
             return mark_safe(
                 '<div style="line-height:1.6;">'
-                '<strong>n8n veya API İstemcisi için:</strong><br>'
+                '<strong>n8n veya Ingest API için:</strong><br>'
                 'Header: <code>Authorization: Bearer &lt;ANAHTAR&gt;</code> veya <code>X-API-Key: &lt;ANAHTAR&gt;</code><br>'
-                'Endpoint: <code>POST /api/flows</code>'
+                'Endpoint: <code>POST /&lt;kategori-slug&gt;/&lt;kanal-slug&gt;</code> (örn: <code>/videodaldassak/allahinyo</code>)<br>'
+                'Alternatif: <code>POST /api/flows</code>'
                 '</div>'
             )
         return mark_safe(
             '<div style="line-height:1.6;">'
             '<strong>FreshRSS veya RSS Okuyucu için:</strong><br>'
-            'Kategori Akışı: <code>https://crss.armaganuzun.com/category/&lt;kategori-slug&gt;?key=&lt;ANAHTAR&gt;</code><br>'
-            'Kanal/Kaynak Akışı: <code>https://crss.armaganuzun.com/channel/&lt;kanal-slug&gt;?key=&lt;ANAHTAR&gt;</code> (veya <code>/youtube/...</code>)'
+            'Kanal/Kaynak Akışı: <code>https://crss.armaganuzun.com/&lt;kategori-slug&gt;/&lt;kanal-slug&gt;?key=&lt;ANAHTAR&gt;</code> (örn: <code>/videodaldassak/allahinyo</code> veya <code>/youtube/evrim-agaci</code>)<br>'
+            'Toplu Kategori Akışı: <code>https://crss.armaganuzun.com/category/&lt;kategori-slug&gt;?key=&lt;ANAHTAR&gt;</code><br>'
+            'Geriye Dönük Uyumluluk: <code>/youtube/&lt;kanal-slug&gt;?key=...</code> veya <code>/channel/...</code>'
             '</div>'
         )
     usage_guide.short_description = 'Kullanım Kılavuzu'

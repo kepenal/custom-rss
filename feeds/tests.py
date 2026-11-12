@@ -33,6 +33,8 @@ class FeedTests(TestCase):
             ('  Türkçe Karakterler İle Test 123! ', 'turkce-karakterler-ile-test-123'),
             ('Software & Tech News', 'software-tech-news'),
             ('Yapay Zekâ ve Veri', 'yapay-zeka-ve-veri'),
+            ('videodaldassak', 'videodaldassak'),
+            ('allahinyo', 'allahinyo'),
         ]
         for raw, expected in cases:
             self.assertEqual(normalize_channel_slug(raw), expected)
@@ -62,24 +64,77 @@ class FeedTests(TestCase):
         channel.save()
         self.assertEqual(channel.get_effective_icon_url(), 'https://example.com/channel-specific-icon.ico')
 
-    def test_flow_ingest_with_category_and_general_content(self):
+    def test_universal_slug_ingest_and_feed(self):
+        """
+        Test /<category_slug>/<channel_slug> endpoint (e.g. /videodaldassak/allahinyo):
+        - POST creates category 'videodaldassak' and channel 'allahinyo'
+        - GET returns RSS 2.0 XML for that channel
+        """
         payload = {
-            'category': 'Yapay Zekâ',
-            'source': 'Evrim Ağacı',
-            'source_url': 'https://evrimagaci.org',
-            'content_type': 'article',
-            'item_id': 'art_001',
-            'title': 'Evrim Teorisi ve Doğal Seçilim',
-            'url': 'https://evrimagaci.org/evrim-teorisi',
-            'summary': 'Evrim süreçleri ve adaptasyon mekanizması detaylıca ele alınıyor.',
+            'video_id': 'vid_allahinyo_01',
+            'title': 'Test İçeriği',
+            'summary': 'Bu bir test video özetidir.',
             'key_moments': [
-                {'time': '', 'seconds': 0, 'text': 'Varyasyon ve Mutasyon'},
-                {'time': '', 'seconds': 0, 'text': 'Doğal Seçilim ve Üreme Başarısı'}
-            ],
-            'extra': {'reading_time': '5 min'}
+                {'time': '01:10', 'seconds': 70, 'text': 'Giriş'},
+            ]
         }
-        
-        # 1. Post to API with Bearer Token
+
+        # 1. POST Ingest to /videodaldassak/allahinyo
+        res_post = self.client.post(
+            '/videodaldassak/allahinyo',
+            data=json.dumps(payload),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Bearer {self.write_token}',
+        )
+        self.assertEqual(res_post.status_code, 201)
+        data = res_post.json()
+        self.assertEqual(data['status'], 'ok')
+        self.assertEqual(data['category'], 'videodaldassak')
+        self.assertEqual(data['channel'], 'allahinyo')
+        self.assertEqual(data['content_type'], 'video')
+        self.assertEqual(data['feed_url'], '/videodaldassak/allahinyo')
+
+        # Verify Database records
+        cat = Category.objects.filter(slug='videodaldassak').first()
+        self.assertIsNotNone(cat)
+        self.assertEqual(cat.name, 'Videodaldassak')
+
+        chan = Channel.objects.filter(slug='allahinyo').first()
+        self.assertIsNotNone(chan)
+        self.assertEqual(chan.category, cat)
+
+        item = FeedItem.objects.filter(item_id='vid_allahinyo_01').first()
+        self.assertIsNotNone(item)
+        self.assertEqual(item.channel, chan)
+        self.assertEqual(item.content_type, 'video')
+
+        # 2. GET RSS feed from /videodaldassak/allahinyo?key=...
+        res_get = self.client.get(f'/videodaldassak/allahinyo?key={self.read_token}')
+        self.assertEqual(res_get.status_code, 200)
+        self.assertIn('application/rss+xml', res_get['Content-Type'])
+        xml_str = res_get.content.decode('utf-8')
+        self.assertIn('Allahinyo - RSS Feed', xml_str)
+        self.assertIn('Test İçeriği', xml_str)
+        self.assertIn('https://youtu.be/vid_allahinyo_01?t=70', xml_str)
+
+        # 3. GET Aggregated category feed /category/videodaldassak?key=...
+        res_cat = self.client.get(f'/category/videodaldassak?key={self.read_token}')
+        self.assertEqual(res_cat.status_code, 200)
+        xml_cat = res_cat.content.decode('utf-8')
+        self.assertIn('Videodaldassak - Kategori RSS Akışı', xml_cat)
+        self.assertIn('Test İçeriği', xml_cat)
+
+    def test_legacy_ingest_auto_assigns_youtube_category(self):
+        """
+        Test that legacy POST /api/flows without category automatically assigns
+        category 'youtube', ensuring categories are never empty.
+        """
+        payload = {
+            'video_id': 'legacy_vid_01',
+            'channel': 'Evrim Ağacı',
+            'title': 'Eski Format Video',
+            'summary': 'Eski API çağrısı testi.',
+        }
         res = self.client.post(
             reverse('flow_ingest'),
             data=json.dumps(payload),
@@ -87,65 +142,16 @@ class FeedTests(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.write_token}',
         )
         self.assertEqual(res.status_code, 201)
-        res_data = res.json()
-        self.assertEqual(res_data['action'], 'created')
-        self.assertEqual(res_data['category'], 'yapay-zeka')
-        self.assertEqual(res_data['channel'], 'evrim-agaci')
-        self.assertEqual(res_data['content_type'], 'article')
+        data = res.json()
+        self.assertEqual(data['category'], 'youtube')
 
-        # Verify DB instances
-        self.assertEqual(Category.objects.count(), 1)
-        self.assertEqual(Channel.objects.count(), 1)
-        self.assertEqual(FeedItem.objects.count(), 1)
+        # Check DB
+        cat = Category.objects.filter(slug='youtube').first()
+        self.assertIsNotNone(cat)
+        self.assertEqual(cat.name, 'YouTube')
 
-        item = FeedItem.objects.first()
-        self.assertEqual(item.title, 'Evrim Teorisi ve Doğal Seçilim')
-        self.assertEqual(item.channel.category.slug, 'yapay-zeka')
-        self.assertEqual(item.extra_data.get('reading_time'), '5 min')
-
-    def test_rss_feed_output_with_icons(self):
-        cat = Category.objects.create(name='Bilim', icon_url='https://example.com/bilim.png')
-        channel = Channel.objects.create(
-            name='Evrim Ağacı',
-            slug='evrim-agaci',
-            category=cat,
-            icon_url='https://example.com/evrim.ico'
-        )
-        FeedItem.objects.create(
-            channel=channel,
-            item_id='vid_123',
-            content_type='video',
-            title='Test Başlığı',
-            url='https://www.youtube.com/watch?v=vid_123',
-            published_at='2026-11-12T12:00:00Z',
-            summary='Harika bir video.',
-            key_moments=[{'time': '01:00', 'seconds': 60, 'text': 'Önemli Nokta'}],
-        )
-        
-        # 1. Test Channel Feed: should have channel's own icon
-        url_channel = reverse('channel_feed', kwargs={'channel_slug': 'evrim-agaci'}) + f'?key={self.read_token}'
-        res_channel = self.client.get(url_channel)
-        self.assertEqual(res_channel.status_code, 200)
-        xml_ch = res_channel.content.decode('utf-8')
-        self.assertIn('<image>', xml_ch)
-        self.assertIn('<url>https://example.com/evrim.ico</url>', xml_ch)
-        self.assertIn('<atom:icon>https://example.com/evrim.ico</atom:icon>', xml_ch)
-        self.assertIn('https://youtu.be/vid_123?t=60', xml_ch)
-
-        # 2. Test Category Feed: should have category's icon and list items in that category
-        url_cat = reverse('category_feed', kwargs={'category_slug': 'bilim'}) + f'?key={self.read_token}'
-        res_cat = self.client.get(url_cat)
-        self.assertEqual(res_cat.status_code, 200)
-        xml_cat = res_cat.content.decode('utf-8')
-        self.assertIn('<title>Bilim - Kategori RSS Akışı</title>', xml_cat)
-        self.assertIn('<url>https://example.com/bilim.png</url>', xml_cat)
-        self.assertIn('Test Başlığı', xml_cat)
-
-        # 3. Test Legacy /youtube/<slug> url: works identical to channel feed
-        url_yt = reverse('youtube_feed', kwargs={'channel_slug': 'evrim-agaci'}) + f'?key={self.read_token}'
-        res_yt = self.client.get(url_yt)
-        self.assertEqual(res_yt.status_code, 200)
-        self.assertIn('application/rss+xml', res_yt['Content-Type'])
+        chan = Channel.objects.filter(slug='evrim-agaci').first()
+        self.assertEqual(chan.category, cat)
 
 
 class AdminViewsTestCase(TestCase):

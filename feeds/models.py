@@ -68,6 +68,12 @@ class Channel(models.Model):
             self.slug = normalize_channel_slug(self.name)
         else:
             self.slug = normalize_channel_slug(self.slug)
+        if not self.category_id:
+            default_cat, _ = Category.objects.get_or_create(
+                slug='genel',
+                defaults={'name': 'Genel'}
+            )
+            self.category = default_cat
         super().save(*args, **kwargs)
 
     @property

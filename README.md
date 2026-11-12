@@ -1,15 +1,24 @@
-# Custom RSS — YouTube RSS Toplayıcı ve Zenginleştirilmiş Feed Servisi
+# Custom RSS Hub — Çok Kaynaklı, Kategori Bazlı ve Zenginleştirilmiş RSS Servisi
 
-Bu proje, arayüzü olmayan (headless), Django tabanlı modern bir arka plan servisidir. **n8n** ve benzeri otomasyon sistemleri üzerinden takip edilen YouTube kanallarının video verilerini, yapay zekâ (LLM) ile üretilmiş **özetlerini** ve **zaman damgalı önemli anlarını (key moments)** kabul eder; FreeRSS vb. tüm standart RSS okuyucuların doğrudan tüketeceği **RSS 2.0 XML** akışlarına dönüştürür.
+Bu proje; arayüzü olmayan (headless), Django tabanlı modern bir **RSS Hub** servisidir. **n8n** ve diğer otomasyon sistemleri üzerinden takip edilen YouTube videolarını, web makalelerini, haber bültenlerini ve podcast içeriklerini; yapay zekâ (LLM) ile üretilmiş **özetleri** ve **zaman damgalı önemli anları (key moments / highlights)** ile birlikte kabul eder. FreshRSS vb. tüm standart RSS okuyucuların doğrudan tüketeceği **RSS 2.0 XML** akışlarına dönüştürür.
 
 ---
 
-## 🌟 Öne Çıkan Özellikler
+## 🌟 Temel Mimari & Öne Çıkan Özellikler
 
-- **Headless & Hafif:** Son kullanıcı HTML arayüzü yerine doğrudan API ve RSS XML sunar; yönetim tamamen **Django Admin** üzerinden yürütülür.
-- **Giriş Ucu (`POST /api/flows`):** n8n veya diğer otomasyon araçlarından JSON veri kabul eder. Aynı `video_id` tekrar geldiğinde veriyi günceller (idempotent upsert), duplicate oluşturmaz.
-- **Çıkış Ucu (`GET /youtube/<channel_slug>`):** Standart RSS 2.0 uyumlu XML feed döner. Video açıklamalarında özet ve tıklanabilir YouTube zaman damgaları (`https://youtu.be/<video_id>?t=seconds`) HTML CDATA olarak yer alır.
+- **Evrensel Kategori / Kanal Hiyerarşisi (`/<category_slug>/<channel_slug>`):**
+  - **Kategori (İçerik Türü / Alan):** `youtube`, `videodaldassak`, `makale`, `haber`, `podcast` vb.
+  - **Kanal / Kaynak (RSS Channel):** `allahinyo`, `evrim-agaci`, `medium-yazari` vb.
+  - Sistem her iki ucu URL'den çözer; URL'deki kategori veya kanal sistemde yoksa **otomatik olarak (`get_or_create`) veritabanında açar**. Kategoriler asla boş kalmaz.
+- **Hibrit Çift Yönlü Uç:**
+  - `POST /<kategori>/<kanal>`: Veri yükleme (Writer API / Ingest). Gönderilen içerik doğrudan ilgili kategori ve kanala bağlanır.
+  - `GET /<kategori>/<kanal>?key=...`: RSS okuyucu (Reader) için standart RSS 2.0 XML akışı sunar.
+- **Toplu Kategori Akışları (`GET /category/<kategori-slug>?key=...`):** Bir kategorideki tüm kanalları tek bir birleşik feed olarak sunar.
+- **Gelişmiş Favicon / Logo Hiyerarşisi:**
+  - FreshRSS'te logosuz akış kalmaması için kanalın kendi `icon_url` değeri varsa o kullanılır;
+  - Kanalın özel logosu yoksa bağlı olduğu kategorinin `icon_url` değeri otomatik devralınır.
 - **Otomatik Slug Normalizasyonu:** Türkçe karakterler (`ş` &rarr; `s`, `ı` &rarr; `i`, `ü` &rarr; `u`, `ö` &rarr; `o`, `ğ` &rarr; `g`, `ç` &rarr; `c`) ve boşluklar otomatik normalize edilir.
+- **Geriye Dönük %100 Uyumluluk:** Eski n8n akışları (`POST /api/flows`) ve eski RSS abonelikleri (`GET /youtube/<slug>`, `GET /channel/<slug>`) kesintisiz çalışmaya devam eder. Kategori belirtilmeyen eski video istekleri otomatik olarak `YouTube` kategorisine atanır.
 - **Çift Katmanlı Güvenli Yetkilendirme (Write vs Read):**
   - **Yazma Yetkisi (`write`):** n8n akışları için ayrı anahtar (`crss_write_...`). Yalnızca video eklemeye/güncellemeye izin verir.
   - **Okuma Yetkisi (`read`):** RSS istemcileri için ayrı anahtar (`crss_read_...`). URL query parametresi (`?key=...`) üzerinden güvenle çalışır.
@@ -70,8 +79,8 @@ API anahtarları `.env` dosyasına yazılmaz; dinamik olarak doğrudan Django Ad
 3. Sol menüden **API Anahtarları** &rarr; **API Anahtarı Ekle** butonuna tıklayın.
 4. **Anahtar Tanımı/İsim** alanına bir etiket verin (örn: `n8n YouTube Akışı` veya `FreeRSS İstemcim`).
 5. **Yetki Türü** seçin:
-   - **Yazma Yetkisi (write):** `POST /api/flows` ucuna video verisi basmak için.
-   - **Okuma Yetkisi (read):** `GET /youtube/<channel-slug>` RSS feed'lerini okumak için.
+   - **Yazma Yetkisi (write):** `POST /<kategori-slug>/<kanal-slug>` veya `POST /api/flows` üzerinden veri yüklemek için (`crss_write_...`).
+   - **Okuma Yetkisi (read):** `GET /<kategori-slug>/<kanal-slug>?key=...` veya `GET /category/<kategori-slug>?key=...` RSS feed'lerini okumak için (`crss_read_...`).
 6. **Kaydet** butonuna basın. Sistem size `crss_write_...` veya `crss_read_...` şeklinde üretilen anahtarı sarı bir uyarı kutusu içinde **tek seferlik** gösterecektir. Bu anahtarı kopyalayıp güvenli bir yere kaydedin.
 
 ---
@@ -84,152 +93,160 @@ API anahtarları `.env` dosyasına yazılmaz; dinamik olarak doğrudan Django Ad
 
 ---
 
-### 1. Video Yükleme ve Güncelleme Ucu (`POST /api/flows`)
+### 1. Veri Yükleme ve Güncelleme Uçları (Writer / Ingest API)
 
-n8n iş akışları veya harici istemcilerden YouTube video özetlerini ve zaman damgalı anlarını yüklemek için kullanılır.
+#### A) Tavsiye Edilen: Slug Bazlı Dinamik Endpoint (`POST /<kategori-slug>/<kanal-slug>`)
+
+Kategori (içerik türü) ve kanal doğrudan URL üzerinden tanımlanır. Sistemde yoksa her ikisi de **otomatik olarak veritabanında oluşturulur** (`get_or_create`). Böylece kategoriler ve kanallar asla boş kalmaz.
 
 - **HTTP Metodu:** `POST`
-- **Endpoint:** `/api/flows`
+- **Endpoint:** `/<kategori-slug>/<kanal-slug>`
+  - *Örnek:* `POST /videodaldassak/allahinyo`
+  - *Örnek:* `POST /youtube/evrim-agaci`
+  - *Örnek:* `POST /makale/medium-yazari`
+  - *Alternatif Prefixler:* `/api/flows/<kategori-slug>/<kanal-slug>` veya `/api/<kategori-slug>/<kanal-slug>`
 - **Yetkilendirme:** `write` yetkisine sahip API anahtarı zorunludur.
-- **Header Alternatifleri (Biri Yeterlidir):**
-  - `Authorization: Bearer <WRITE_API_KEY>`
-  - `X-API-Key: <WRITE_API_KEY>`
+  - Header: `Authorization: Bearer crss_write_...` veya `X-API-Key: crss_write_...`
 - **İçerik Türü (Content-Type):** `application/json`
 
-#### İstek Gövdesi (Payload Parametreleri):
-
-| Alan Adı | Tip | Zorunlu mu? | Açıklama |
-|---|---|:---:|---|
-| `channel` | string | **Evet** | YouTube kanalının adı (örn: `Evrim Ağacı`). Kanal sistemde yoksa otomatik açılır. |
-| `channel_url` | string (URL) | Hayır | YouTube kanalının bağlantısı (örn: `https://www.youtube.com/@evrimagaci`). |
-| `video_id` | string | **Evet** | YouTube Video ID'si (örn: `dQw4w9WgXcQ`). Benzersizdir (Unique). |
-| `title` | string | **Evet** | Videonun başlığı. |
-| `url` | string (URL) | Hayır | Video doğrudan izleme linki. Boş bırakılırsa `https://www.youtube.com/watch?v=<video_id>` olarak otomatik atanır. |
-| `published_at` | string (ISO 8601) | Hayır | Videonun yayınlanma zamanı (örn: `2026-11-12T10:00:00Z`). Boşsa sunucu saati verilir. |
-| `summary` | string | Hayır | Videonun yapay zekâ veya kullanıcı özeti metni. |
-| `key_moments` | array of objects | Hayır | Zaman damgalı önemli anların listesi. |
-
-##### `key_moments` Eleman Yapısı:
+##### Örnek Payload (`POST /videodaldassak/allahinyo`):
 ```json
 {
-  "time": "01:23",      // Okuyucuda görünecek zaman etiketi
-  "seconds": 83,         // Tıklanabilir YouTube zaman linki için saniye cinsinden karşılık
-  "text": "Bölüm başlığı / açıklaması"
+  "item_id": "vid_001",
+  "title": "Yapay Zekâ ile Kodlama Rehberi",
+  "url": "https://www.youtube.com/watch?v=vid_001",
+  "published_at": "2026-11-12T10:00:00Z",
+  "summary": "Bu bölümde yapay zekâ araçlarının modern geliştirme süreçlerine entegrasyonu inceleniyor.",
+  "key_moments": [
+    {"time": "01:15", "seconds": 75, "text": "Giriş ve Mimari"},
+    {"time": "04:20", "seconds": 260, "text": "API Entegrasyonu"}
+  ]
 }
 ```
 
-#### Örnek cURL Çağrısı:
+##### cURL Çağrısı:
 ```bash
-curl -X POST https://crss.armaganuzun.com/api/flows   -H "Authorization: Bearer crss_write_9a8b7c6d5e4f3a2b1c0d"   -H "Content-Type: application/json"   -d '{
-    "channel": "Evrim Ağacı",
-    "channel_url": "https://www.youtube.com/@evrimagaci",
-    "video_id": "dQw4w9WgXcQ",
-    "title": "Evrim Teorisi ve Doğal Seçilim",
-    "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "published_at": "2026-11-12T10:00:00Z",
-    "summary": "Evrim teorisi, doğal seçilim mekanizmaları ve türleşme süreçleri ele alınıyor.",
+curl -X POST https://crss.armaganuzun.com/videodaldassak/allahinyo \
+  -H "Authorization: Bearer crss_write_SIZIN_ANAHTARINIZ" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "item_id": "vid_001",
+    "title": "Yapay Zekâ ile Kodlama Rehberi",
+    "summary": "Bu bölümde yapay zekâ araçlarının modern geliştirme süreçlerine entegrasyonu inceleniyor.",
     "key_moments": [
-      {
-        "time": "01:23",
-        "seconds": 83,
-        "text": "Doğal Seçilim Mekanizması"
-      },
-      {
-        "time": "05:40",
-        "seconds": 340,
-        "text": "Türleşme Örnekleri"
-      }
+      {"time": "01:15", "seconds": 75, "text": "Giriş ve Mimari"},
+      {"time": "04:20", "seconds": 260, "text": "API Entegrasyonu"}
     ]
   }'
 ```
 
-#### Başarılı Yanıtlar:
+#### B) Standart Endpoint (`POST /api/flows`)
 
-- **201 Created (İlk Kez Eklendiğinde):**
+Kategori ve kanal bilgisini URL yerine JSON gövdesinde göndermek isterseniz standart endpoint'i kullanabilirsiniz:
+
+```json
+{
+  "category": "videodaldassak",
+  "channel": "allahinyo",
+  "item_id": "vid_001",
+  "title": "Yapay Zekâ ile Kodlama Rehberi",
+  "summary": "AI özet metni...",
+  "key_moments": [{"time": "01:15", "seconds": 75, "text": "Giriş"}]
+}
+```
+*(Not: `category` belirtilmezse ve `video_id` gönderilirse otomatik olarak `YouTube` kategorisi atanır; diğer durumlarda `Genel` kategorisine bağlanır.)*
+
+#### Payload Parametreleri Tablosu:
+
+| Alan Adı | Tip | Zorunlu mu? | Açıklama |
+|---|---|:---:|---|
+| `item_id` (veya `video_id`) | string | **Evet** | İçeriğin benzersiz ID'si (YouTube ID veya içerik hash/slug). Benzersizdir. |
+| `title` | string | **Evet** | İçeriğin başlığı. |
+| `channel` / `channel_slug` | string | URL yoksa Evet | Kanal veya kaynak adı (URL'de geçilmişse URL önceliklidir). |
+| `category` / `category_slug` | string | Hayır | Kategori / içerik türü (URL'de geçilmişse URL önceliklidir). |
+| `content_type` | string | Hayır | `video`, `article`, `news`, `podcast`, `social`, `general` (belirtilmezse kategoriden otomatik algılanır). |
+| `url` | string (URL) | Hayır | İçeriğe doğrudan bağlantı linki. |
+| `published_at` | string (ISO 8601) | Hayır | Yayınlanma zamanı (ISO 8601). Boşsa sunucu saati atanır. |
+| `summary` | string | Hayır | İçeriğin yapay zekâ veya kullanıcı özeti metni. |
+| `key_moments` | array of objects | Hayır | Zaman damgalı önemli anlar listesi (`time`, `seconds`, `text`). |
+| `channel_icon_url` | string (URL) | Hayır | Kanala özel logo/favicon bağlantısı. |
+| `category_icon_url` | string (URL) | Hayır | Kategoriye özel logo/favicon bağlantısı. |
+
+#### Başarılı Yanıt (Response):
 ```json
 {
   "status": "ok",
   "action": "created",
-  "video_id": "dQw4w9WgXcQ",
-  "channel": "evrim-agaci",
-  "title": "Evrim Teorisi ve Doğal Seçilim"
+  "item_id": "vid_001",
+  "video_id": "vid_001",
+  "category": "videodaldassak",
+  "channel": "allahinyo",
+  "content_type": "video",
+  "title": "Yapay Zekâ ile Kodlama Rehberi",
+  "feed_url": "/videodaldassak/allahinyo"
 }
 ```
-
-- **200 OK (Var Olan Video Güncellendiğinde):**
-```json
-{
-  "status": "ok",
-  "action": "updated",
-  "video_id": "dQw4w9WgXcQ",
-  "channel": "evrim-agaci",
-  "title": "Evrim Teorisi ve Doğal Seçilim"
-}
-```
-
-#### n8n HTTP Request Node Ayarları:
-1. **Method:** `POST`
-2. **URL:** `https://crss.armaganuzun.com/api/flows`
-3. **Authentication:** `None` seçip **Send Headers** alanına:
-   - `Authorization`: `Bearer crss_write_ANAHTARINIZ`
-4. **Send Body:** `True`
-5. **Body Content Type:** `JSON`
-6. **Specify Body:** `Using JSON` seçerek yukarıdaki JSON nesnesini bağlayın.
 
 ---
 
-### 2. RSS Feed XML Akışı (`GET /youtube/<channel_slug>`)
+### 2. RSS Feed XML Akışları (FreshRSS & Okuyucular)
 
-FreeRSS, Feedly, Inoreader, NetNewsWire, Thunderbird veya herhangi bir RSS okuyucunun doğrudan abone olabileceği zenginleştirilmiş standart RSS 2.0 XML akışı döner.
+#### A) Kanal / Kaynak Feed'i (`GET /<kategori-slug>/<kanal-slug>?key=...`)
 
-- **HTTP Metodu:** `GET`
-- **Endpoint:** `/youtube/<channel_slug>`
-- **Yetkilendirme:** `read` yetkisine sahip API anahtarı zorunludur.
-
-#### Kanal Slug Mantığı:
-Kanal isimlerindeki Türkçe karakterler ve boşluklar otomatik çevrilir:
-- *Evrim Ağacı* &rarr; `evrim-agaci`
-- *Murat Şen* &rarr; `murat-sen`
-- *Yukarıalınlı Köyü* &rarr; `yukarialinli-koyu`
-
-#### RSS Okuyucular İçin Kullanım (Query Parametresi):
-RSS okuyucu uygulamanıza (FreeRSS vb.) feed linki eklerken URL sonuna `?key=...` parametresini ekleyin:
+FreshRSS, Feedly, Inoreader, NetNewsWire veya herhangi bir RSS okuyucuda abone olmak için:
 
 ```
-https://crss.armaganuzun.com/youtube/evrim-agaci?key=crss_read_SIZIN_ANAHTARINIZ
+https://crss.armaganuzun.com/videodaldassak/allahinyo?key=crss_read_ANAHTARINIZ
+```
+veya YouTube için:
+```
+https://crss.armaganuzun.com/youtube/evrim-agaci?key=crss_read_ANAHTARINIZ
 ```
 
-#### cURL İle Test:
-```bash
-curl -X GET "https://crss.armaganuzun.com/youtube/evrim-agaci?key=crss_read_SIZIN_ANAHTARINIZ"
+#### B) Toplu Kategori Feed'i (`GET /category/<kategori-slug>?key=...`)
+
+Bir kategorideki (örn: `videodaldassak` veya `teknoloji`) **tüm kanalların** içeriklerini tek bir birleşik akışta toplamak için:
+
+```
+https://crss.armaganuzun.com/category/videodaldassak?key=crss_read_ANAHTARINIZ
 ```
 
-#### Dönen XML Akışı (RSS 2.0 Standart):
+#### C) Geriye Dönük Uyumluluk Linkleri:
+- `https://crss.armaganuzun.com/youtube/<kanal-slug>?key=...`
+- `https://crss.armaganuzun.com/channel/<kanal-slug>?key=...`
+- `https://crss.armaganuzun.com/source/<kanal-slug>?key=...`
+
+#### Dönen Standart RSS 2.0 XML Akışı Örneği:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Evrim Ağacı - YouTube RSS</title>
-    <link>https://www.youtube.com/@evrimagaci</link>
-    <description>Evrim Ağacı kanalına ait yapay zekâ özetli ve zaman damgalı RSS feed akışı.</description>
+    <title>allahinyo - videodaldassak RSS</title>
+    <link>https://crss.armaganuzun.com/videodaldassak/allahinyo</link>
+    <description>allahinyo kaynağına ait yapay zekâ özetli ve zenginleştirilmiş RSS feed akışı.</description>
     <language>tr</language>
     <lastBuildDate>Thu, 12 Nov 2026 14:00:00 +0000</lastBuildDate>
-    <atom:link href="https://crss.armaganuzun.com/youtube/evrim-agaci" rel="self" type="application/rss+xml"/>
+    <image>
+      <url>https://example.com/favicon.png</url>
+      <title>allahinyo - videodaldassak RSS</title>
+      <link>https://crss.armaganuzun.com/videodaldassak/allahinyo</link>
+    </image>
+    <atom:link href="https://crss.armaganuzun.com/videodaldassak/allahinyo" rel="self" type="application/rss+xml"/>
     <item>
-      <title>Evrim Teorisi ve Doğal Seçilim</title>
-      <link>https://www.youtube.com/watch?v=dQw4w9WgXcQ</link>
-      <guid isPermaLink="false">dQw4w9WgXcQ</guid>
+      <title>Yapay Zekâ ile Kodlama Rehberi</title>
+      <link>https://www.youtube.com/watch?v=vid_001</link>
+      <guid isPermaLink="false">vid_001</guid>
       <pubDate>Thu, 12 Nov 2026 10:00:00 +0000</pubDate>
       <description><![CDATA[
         <h3>Özet</h3>
-        <p>Evrim teorisi, doğal seçilim mekanizmaları ve türleşme süreçleri ele alınıyor.</p>
+        <p>Bu bölümde yapay zekâ araçlarının modern geliştirme süreçlerine entegrasyonu inceleniyor.</p>
         <h3>Önemli Anlar</h3>
         <ul>
-          <li><a href="https://youtu.be/dQw4w9WgXcQ?t=83" target="_blank"><strong>[01:23]</strong></a> Doğal Seçilim Mekanizması</li>
-          <li><a href="https://youtu.be/dQw4w9WgXcQ?t=340" target="_blank"><strong>[05:40]</strong></a> Türleşme Örnekleri</li>
+          <li><a href="https://youtu.be/vid_001?t=75" target="_blank"><strong>[01:15]</strong></a> Giriş ve Mimari</li>
+          <li><a href="https://youtu.be/vid_001?t=260" target="_blank"><strong>[04:20]</strong></a> API Entegrasyonu</li>
         </ul>
         <hr/>
-        <p><a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank">YouTube'da İzle &rarr;</a></p>
+        <p><a href="https://www.youtube.com/watch?v=vid_001" target="_blank">İçeriği Görüntüle &rarr;</a></p>
       ]]></description>
     </item>
   </channel>
