@@ -100,17 +100,7 @@ def build_rss_xml(title, link, description, items, request_url, icon_url=''):
                     has_cta = True
 
         if not has_cta:
-            is_steam = (
-                (item.category and item.category.slug == 'oyun-guncellemeleri') or
-                (item.url and 'steampowered.com' in item.url) or
-                (item.channel and 'steam' in item.channel.slug)
-            )
-            if item.content_type == 'video' or (item.category and item.category.slug == 'youtube'):
-                cta_text = "YouTube'da İzle &rarr;"
-            elif is_steam:
-                cta_text = "Steam'de Orijinal Duyuruyu Görüntüle &rarr;"
-            else:
-                cta_text = "Kaynağa Git &rarr;"
+            cta_text = "YouTube'da İzle &rarr;" if item.content_type == 'video' else "Kaynağa Git &rarr;"
             html_parts.append(f"<p><a href=\"{xml_escape(item.url)}\" target=\"_blank\">{cta_text}</a></p>")
         description_html = "\n".join(html_parts)
 
