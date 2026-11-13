@@ -54,10 +54,7 @@ def build_rss_xml(title, link, description, items, request_url, icon_url=''):
             # xml_escape YAPILMAMALIDIR. Aksi halde FreshRSS ve RSS okuyucularda
             # etiketler düz metin (&lt;b&gt;) olarak render edilir.
             if summary_clean.startswith("<p") or summary_clean.startswith("<div"):
-                if "⚡" in summary_clean or "özet" in summary_clean.lower() or "<h3>" in summary_clean.lower() or "<h2>" in summary_clean.lower():
-                    html_parts.append(summary_clean)
-                else:
-                    html_parts.append(f"<h3>Özet</h3>\n{summary_clean}")
+                html_parts.append(f"<h3>Özet</h3>\n{summary_clean}")
             else:
                 # Düz metin ise ve blok etiket içermiyorsa satır sonlarını işle
                 if "\n" in summary_clean and not any(tag in summary_clean.lower() for tag in ["<p", "<div", "<br", "<ul", "<ol"]):
@@ -92,16 +89,8 @@ def build_rss_xml(title, link, description, items, request_url, icon_url=''):
                     html_parts.append(f"<li>{str(km).strip()}</li>")
             html_parts.append("</ul>")
 
-        has_cta = False
-        if item.summary:
-            s_lower = str(item.summary).lower()
-            if "<a " in s_lower and "href=" in s_lower:
-                if (item.url and item.url.lower() in s_lower) or "izle" in s_lower or "steam" in s_lower or "kaynak" in s_lower or "duyuru" in s_lower:
-                    has_cta = True
-
-        if not has_cta:
-            cta_text = "YouTube'da İzle &rarr;" if item.content_type == 'video' else "Kaynağa Git &rarr;"
-            html_parts.append(f"<p><a href=\"{xml_escape(item.url)}\" target=\"_blank\">{cta_text}</a></p>")
+        cta_text = "YouTube'da İzle &rarr;" if item.content_type == 'video' else "Kaynağa Git &rarr;"
+        html_parts.append(f"<p><a href=\"{xml_escape(item.url)}\" target=\"_blank\">{cta_text}</a></p>")
         description_html = "\n".join(html_parts)
 
         xml_lines.append('    <item>')
